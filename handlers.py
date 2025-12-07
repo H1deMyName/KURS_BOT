@@ -317,10 +317,16 @@ async def process_plan_name(message: types.Message, state: FSMContext):
         await message.answer("План с таким названием уже существует. Пожалуйста, введите другое название:")
         return
 
+    # Сразу создаем план без группы мышц
     plan_id = create_workout_plan(message.from_user.id, plan_name)
     await state.update_data(current_plan_id=plan_id)
-    await message.answer(f"План '{plan_name}' создан. Теперь выберите группу мышц для добавления упражнений:", reply_markup=muscle_group_keyboard)
+    
+    await message.answer(
+        f"План '{plan_name}' создан. Теперь выберите группу мышц для добавления упражнений:",
+        reply_markup=muscle_group_keyboard
+    )
     await state.set_state(PlanCreationStates.waiting_for_muscle_group)
+
 
 async def process_muscle_group_selection(callback: types.CallbackQuery, state: FSMContext):
     if callback.data == 'finish_exercises':

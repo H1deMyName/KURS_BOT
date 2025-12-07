@@ -10,6 +10,7 @@ class RegistrationStates(StatesGroup):
 
 class PlanCreationStates(StatesGroup):
     waiting_for_plan_name = State()
+    waiting_for_plan_muscle_group = State()
     waiting_for_muscle_group = State()
     waiting_for_exercise_selection = State()
     waiting_for_add_more_exercises = State()

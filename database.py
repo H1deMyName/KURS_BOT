@@ -1,4 +1,5 @@
 import sqlite3
+import json
 
 def init_db():
     conn = sqlite3.connect('fitness_bot.db')
@@ -35,6 +36,7 @@ def init_db():
             plan_id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
             name TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES Users(user_id)
         )
     ''')
@@ -79,30 +81,12 @@ def populate_exercises():
         if cur.fetchone()[0] > 0:
             return # Не заполнять, если уже заполнено
 
+        with open('exercises.json', 'r', encoding='utf-8') as f:
+            exercises_data = json.load(f)
+        
         exercises = [
-            # Грудь
-            ('Жим лежа', 'Грудь', 3, '8-12'),
-            ('Жим гантелей лежа', 'Грудь', 3, '10-15'),
-            ('Отжимания на брусьях', 'Грудь', 3, '10-15'),
-            ('Сведение рук в кроссовере', 'Грудь', 3, '12-15'),
-            # Спина
-            ('Подтягивания', 'Спина', 4, '6-10'),
-            ('Тяга штанги в наклоне', 'Спина', 3, '8-12'),
-            ('Тяга вертикального блока', 'Спина', 3, '10-15'),
-            ('Горизонтальная тяга', 'Спина', 3, '10-15'),
-            # Ноги
-            ('Приседания со штангой', 'Ноги', 4, '8-12'),
-            ('Жим ногами', 'Ноги', 3, '10-15'),
-            ('Становая тяга', 'Ноги', 3, '6-8'),
-            ('Выпады с гантелями', 'Ноги', 3, '10-12'),
-            # Плечи
-            ('Армейский жим', 'Плечи', 4, '8-12'),
-            ('Махи гантелями в стороны', 'Плечи', 3, '12-15'),
-            ('Тяга штанги к подбородку', 'Плечи', 3, '10-12'),
-            # Руки
-            ('Сгибания рук со штангой', 'Руки', 3, '8-12'),
-            ('Французский жим', 'Руки', 3, '10-15'),
-            ('Молотковые сгибания', 'Руки', 3, '10-12')
+            (ex['name'], ex['muscle_group'], ex['default_sets'], ex['default_reps']) 
+            for ex in exercises_data
         ]
         
         cur.executemany("INSERT INTO Exercises (name, muscle_group, default_sets, default_reps) VALUES (?, ?, ?, ?)", exercises)
