@@ -1,0 +1,110 @@
+[
+  {
+    "name": "Жим лежа",
+    "muscle_group": "Грудь",
+    "default_sets": 3,
+    "default_reps": "8-12"
+  },
+  {
+    "name": "Жим гантелей лежа",
+    "muscle_group": "Грудь",
+    "default_sets": 3,
+    "default_reps": "10-15"
+  },
+  {
+    "name": "Отжимания на брусьях",
+    "muscle_group": "Грудь",
+    "default_sets": 3,
+    "default_reps": "10-15"
+  },
+  {
+    "name": "Сведение рук в кроссовере",
+    "muscle_group": "Грудь",
+    "default_sets": 3,
+    "default_reps": "12-15"
+  },
+  {
+    "name": "Подтягивания",
+    "muscle_group": "Спина",
+    "default_sets": 4,
+    "default_reps": "6-10"
+  },
+  {
+    "name": "Тяга штанги в наклоне",
+    "muscle_group": "Спина",
+    "default_sets": 3,
+    "default_reps": "8-12"
+  },
+  {
+    "name": "Тяга вертикального блока",
+    "muscle_group": "Спина",
+    "default_sets": 3,
+    "default_reps": "10-15"
+  },
+  {
+    "name": "Горизонтальная тяга",
+    "muscle_group": "Спина",
+    "default_sets": 3,
+    "default_reps": "10-15"
+  },
+  {
+    "name": "Приседания со штангой",
+    "muscle_group": "Ноги",
+    "default_sets": 4,
+    "default_reps": "8-12"
+  },
+  {
+    "name": "Жим ногами",
+    "muscle_group": "Ноги",
+    "default_sets": 3,
+    "default_reps": "10-15"
+  },
+  {
+    "name": "Становая тяга",
+    "muscle_group": "Ноги",
+    "default_sets": 3,
+    "default_reps": "6-8"
+  },
+  {
+    "name": "Выпады с гантелями",
+    "muscle_group": "Ноги",
+    "default_sets": 3,
+    "default_reps": "10-12"
+  },
+  {
+    "name": "Армейский жим",
+    "muscle_group": "Плечи",
+    "default_sets": 4,
+    "default_reps": "8-12"
+  },
+  {
+    "name": "Махи гантелями в стороны",
+    "muscle_group": "Плечи",
+    "default_sets": 3,
+    "default_reps": "12-15"
+  },
+  {
+    "name": "Тяга штанги к подбородку",
+    "muscle_group": "Плечи",
+    "default_sets": 3,
+    "default_reps": "10-12"
+  },
+  {
+    "name": "Сгибания рук со штангой",
+    "muscle_group": "Руки",
+    "default_sets": 3,
+    "default_reps": "8-12"
+  },
+  {
+    "name": "Французский жим",
+    "muscle_group": "Руки",
+    "default_sets": 3,
+    "default_reps": "10-15"
+  },
+  {
+    "name": "Молотковые сгибания",
+    "muscle_group": "Руки",
+    "default_sets": 3,
+    "default_reps": "10-12"
+  }
+]
