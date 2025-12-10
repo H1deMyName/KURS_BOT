@@ -16,7 +16,7 @@ from states import (
     ProfileEditingStates, ViewProgressStates, PlanEditingStates)
 from tools import calculate_bmi, calculate_calories
 
-# --- Клавиатуры ---
+
 main_menu_keyboard = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text="📝 Планирование"), KeyboardButton(text="📊 Трекинг прогресса")],
     [KeyboardButton(text="👤 Профиль"), KeyboardButton(text="❓ Помощь")],
@@ -74,9 +74,8 @@ def get_edit_plan_menu_keyboard(plan_id):
         [InlineKeyboardButton(text="↩️ Назад к планам", callback_data="back_to_plans")]
     ])
 
-# --- Регистрация обработчиков ---
+
 def register_handlers(dp: Dispatcher):
-    # Обработчики команд и текста
     dp.message.register(cmd_start, Command("start"))
     dp.message.register(cmd_plan, lambda message: message.text == "📝 Планирование" or message.text == "/plan")
     dp.message.register(cmd_log, lambda message: message.text == "📊 Трекинг прогресса" or message.text == "/log")
@@ -84,7 +83,6 @@ def register_handlers(dp: Dispatcher):
     dp.message.register(cmd_profile, lambda message: message.text == "👤 Профиль" or message.text == "/profile")
     dp.message.register(cmd_help, lambda message: message.text == "❓ Помощь" or message.text == "/help")
 
-    # Обработчики состояний (Регистрация)
     dp.message.register(process_weight, RegistrationStates.waiting_for_weight)
     dp.message.register(process_height, RegistrationStates.waiting_for_height)
     dp.message.register(process_age, RegistrationStates.waiting_for_age)
@@ -92,7 +90,6 @@ def register_handlers(dp: Dispatcher):
     dp.message.register(process_activity_level, RegistrationStates.waiting_for_activity_level)
     dp.message.register(process_target, RegistrationStates.waiting_for_target)
 
-    # Обработчики состояний (Создание и редактирование плана)
     dp.message.register(process_plan_name, PlanCreationStates.waiting_for_plan_name)
     dp.callback_query.register(process_muscle_group_selection, 
                                lambda c: c.data.startswith('mg_') or c.data == 'finish_exercises',
@@ -104,18 +101,15 @@ def register_handlers(dp: Dispatcher):
                                lambda c: c.data in ['add_more_exercises', 'finish_plan'], 
                                PlanCreationStates.waiting_for_add_more_exercises)
 
-    # Обработчики состояний (Запись прогресса)
     dp.callback_query.register(handle_plan_for_logging, lambda c: c.data.startswith('log_plan_'), LogProgressStates.waiting_for_plan_selection)
     dp.callback_query.register(handle_exercise_for_logging, lambda c: c.data.startswith('log_ex_'), LogProgressStates.waiting_for_exercise_selection)
     dp.message.register(process_log_details, LogProgressStates.waiting_for_log_details)
     
-    # Обработчики состояний (Просмотр прогресса)
     dp.callback_query.register(handle_view_progress_button, lambda c: c.data == 'view_progress')
     dp.callback_query.register(handle_plan_for_viewing, lambda c: c.data.startswith('view_plan_progress_'), ViewProgressStates.waiting_for_plan_selection)
     dp.callback_query.register(handle_exercise_for_viewing, lambda c: c.data.startswith('view_ex_progress_'), ViewProgressStates.waiting_for_exercise_selection)
     dp.callback_query.register(handle_progress_filter, lambda c: c.data.startswith('progress_'))
 
-    # Обработчики состояний (Редактирование профиля)
     dp.message.register(process_edited_weight, ProfileEditingStates.editing_weight)
     dp.message.register(process_edited_height, ProfileEditingStates.editing_height)
     dp.message.register(process_edited_age, ProfileEditingStates.editing_age)
@@ -123,11 +117,9 @@ def register_handlers(dp: Dispatcher):
     dp.message.register(process_edited_activity, ProfileEditingStates.editing_activity)
     dp.message.register(process_edited_target, ProfileEditingStates.editing_target)
 
-    # Обработчики состояний (Редактирование плана)
     dp.message.register(process_plan_rename, PlanEditingStates.renaming_plan)
     dp.callback_query.register(handle_remove_exercise_from_plan, lambda c: c.data.startswith('del_ex_from_plan_'), PlanEditingStates.removing_exercise)
 
-    # Общие обработчики запросов обратного вызова
     dp.callback_query.register(handle_reset_profile, lambda c: c.data == 'reset_profile')
     dp.callback_query.register(handle_edit_profile, lambda c: c.data == 'edit_profile')
     dp.callback_query.register(handle_start_registration, lambda c: c.data == 'start_registration')
@@ -136,7 +128,6 @@ def register_handlers(dp: Dispatcher):
     dp.callback_query.register(handle_edit_plan_action, lambda c: c.data.startswith(('rename_plan_', 'add_ex_to_plan_', 'remove_ex_from_plan_', 'back_to_plans')))
 
 
-# --- Обработчики команд ---
 async def cmd_start(message: types.Message, state: FSMContext):
     if not get_user(message.from_user.id):
         await message.answer("Добро пожаловать! Для начала работы с ботом, давайте зарегистрируемся.", reply_markup=registration_keyboard)
@@ -230,7 +221,7 @@ async def cmd_help(message: types.Message):
         "/help - Показывает эту справку.")
     await message.answer(help_text, parse_mode="Markdown")
 
-# --- Обработчики состояний (Регистрация) ---
+
 async def process_weight(message: types.Message, state: FSMContext):
     try:
         weight = float(message.text.replace(',', '.'))
@@ -306,7 +297,7 @@ async def process_target(message: types.Message, state: FSMContext):
     else:
         await message.answer("Пожалуйста, выберите один из вариантов.")
 
-# --- Обработчики состояний (Создание и редактирование плана) ---
+
 async def process_plan_name(message: types.Message, state: FSMContext):
     plan_name = message.text.strip()
     if not plan_name:
@@ -317,7 +308,6 @@ async def process_plan_name(message: types.Message, state: FSMContext):
         await message.answer("План с таким названием уже существует. Пожалуйста, введите другое название:")
         return
 
-    # Сразу создаем план без группы мышц
     plan_id = create_workout_plan(message.from_user.id, plan_name)
     await state.update_data(current_plan_id=plan_id)
     
@@ -394,7 +384,7 @@ async def process_add_more_exercises(callback: types.CallbackQuery, state: FSMCo
         await state.clear()
     await callback.answer()
 
-# --- Обработчики состояний (Запись прогресса) ---
+
 async def handle_plan_for_logging(callback: types.CallbackQuery, state: FSMContext):
     plan_id = int(callback.data.split('_')[-1])
     
@@ -448,7 +438,7 @@ async def process_log_details(message: types.Message, state: FSMContext):
     except (ValueError, IndexError):
         await message.answer("Неверный формат. Пожалуйста, введите данные в формате 'ВЕСxПОДХОДЫxПОВТОРЕНИЯ', например: 80x3x10.")
 
-# --- Обработчики просмотра прогресса ---
+
 async def handle_view_progress_button(callback: types.CallbackQuery, state: FSMContext):
     user_plans = get_user_workout_plans(callback.from_user.id)
     if not user_plans:
@@ -552,7 +542,7 @@ async def handle_progress_filter(callback: types.CallbackQuery, state: FSMContex
     await callback.message.edit_text(response_text, reply_markup=progress_filter_keyboard, parse_mode="Markdown")
     await callback.answer()
 
-# --- Обработчики состояний (Редактирование профиля) ---
+
 async def process_edited_weight(message: types.Message, state: FSMContext):
     try:
         weight = float(message.text.replace(',', '.'))
@@ -616,7 +606,7 @@ async def process_edited_target(message: types.Message, state: FSMContext):
     else:
         await message.answer("Пожалуйста, выберите один из предложенных вариантов.", reply_markup=target_keyboard)
 
-# --- Обработчики обратных вызовов ---
+
 async def handle_reset_profile(callback: types.CallbackQuery, state: FSMContext):
     delete_user(callback.from_user.id)
     await callback.message.edit_text("Ваш профиль был сброшен. Для повторной регистрации используйте команду /start.")
@@ -635,7 +625,6 @@ async def handle_plan_action(callback: types.CallbackQuery, state: FSMContext):
     action_parts = callback.data.split('_')
     action = action_parts[0]
 
-    # Обработка кнопки "назад" из просмотра плана
     if callback.data == 'back_to_plans_from_view':
         await state.clear()
         user_plans = get_user_workout_plans(callback.from_user.id)

@@ -28,13 +28,11 @@ def calculate_calories(gender: str, weight: float, height: int, age: int, activi
     Рассчитывает суточную норму калорий по формуле Миффлина-Сан Жеора.
     :return: Словарь с потребностями в калориях для разных целей.
     """
-    # Расчет базального метаболизма (BMR)
     if gender == "Мужской":
         bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5
-    else:  # Женский
+    else:
         bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161
 
-    # Множитель активности
     activity_multipliers = {
         "Минимальная": 1.2,
         "Легкая": 1.375,
@@ -46,7 +44,7 @@ def calculate_calories(gender: str, weight: float, height: int, age: int, activi
     maintenance_calories = bmr * multiplier
 
     return {
-        "Сброс веса": int(maintenance_calories * 0.85),  # -15% дефицит
+        "Сброс веса": int(maintenance_calories * 0.85),
         "Поддержание": int(maintenance_calories),
-        "Набор массы": int(maintenance_calories * 1.15)  # +15% профицит
+        "Набор массы": int(maintenance_calories * 1.15)
     }
