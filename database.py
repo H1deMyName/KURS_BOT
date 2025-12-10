@@ -1,27 +1,38 @@
 import sqlite3
 import json
+from datetime import datetime, timedelta
+
+DB_NAME = 'fitness_bot.db'
+
+def _execute(query, params=(), fetchone=False, fetchall=False, commit=False):
+    """Универсальная функция для выполнения запросов к БД."""
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        if commit:
+            conn.commit()
+            return cursor.lastrowid
+        if fetchone:
+            return cursor.fetchone()
+        if fetchall:
+            return cursor.fetchall()
 
 def init_db():
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-
-    # Таблица для пользователей
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS Users (
+    """Инициализирует базу данных, создает таблицы и загружает упражнения из JSON."""
+    # Создание таблиц
+    _execute('''
+        CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
             weight REAL,
             height INTEGER,
             age INTEGER,
             gender TEXT,
             target TEXT,
-            activity_level TEXT 
+            activity_level TEXT
         )
     ''')
-
-    # Таблица для упражнений
-    cur.execute("DROP TABLE IF EXISTS Exercises") # Удалить для обновления схемы во время разработки
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS Exercises (
+    _execute('''
+        CREATE TABLE IF NOT EXISTS exercises (
             exercise_id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
             muscle_group TEXT NOT NULL,
@@ -29,254 +40,167 @@ def init_db():
             default_reps TEXT
         )
     ''')
-
-    # Таблица для планов тренировок
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS WorkoutPlans (
+    _execute('''
+        CREATE TABLE IF NOT EXISTS workout_plans (
             plan_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
+            user_id INTEGER NOT NULL,
             name TEXT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES Users(user_id)
+            FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
         )
     ''')
-
-    # Таблица для связи упражнений в плане тренировок
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS WorkoutPlanExercises (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            plan_id INTEGER,
-            exercise_id INTEGER,
+    _execute('''
+        CREATE TABLE IF NOT EXISTS workout_plan_exercises (
+            plan_exercise_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            plan_id INTEGER NOT NULL,
+            exercise_id INTEGER NOT NULL,
             sets INTEGER,
             reps TEXT,
-            FOREIGN KEY (plan_id) REFERENCES WorkoutPlans(plan_id),
-            FOREIGN KEY (exercise_id) REFERENCES Exercises(exercise_id)
+            FOREIGN KEY (plan_id) REFERENCES workout_plans (plan_id) ON DELETE CASCADE,
+            FOREIGN KEY (exercise_id) REFERENCES exercises (exercise_id) ON DELETE CASCADE
         )
     ''')
-    
-    # Таблица для журналов прогресса
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS ProgressLogs (
+    _execute('''
+        CREATE TABLE IF NOT EXISTS progress_logs (
             log_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            exercise_id INTEGER,
+            user_id INTEGER NOT NULL,
+            exercise_id INTEGER NOT NULL,
             weight REAL,
             sets INTEGER,
             reps TEXT,
-            log_date DATETIME,
-            FOREIGN KEY (user_id) REFERENCES Users(user_id),
-            FOREIGN KEY (exercise_id) REFERENCES Exercises(exercise_id)
+            log_date DATE DEFAULT (date('now')),
+            FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
+            FOREIGN KEY (exercise_id) REFERENCES exercises (exercise_id) ON DELETE CASCADE
         )
     ''')
+    # Загрузка упражнений из JSON
+    _load_exercises_from_json()
 
-    conn.commit()
-    conn.close()
-
-def populate_exercises():
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-
+def _load_exercises_from_json():
+    """Очищает таблицу упражнений и загружает в нее данные из exercises.json."""
     try:
-        cur.execute("SELECT COUNT(*) FROM Exercises")
-        if cur.fetchone()[0] > 0:
-            return # Не заполнять, если уже заполнено
-
         with open('exercises.json', 'r', encoding='utf-8') as f:
-            exercises_data = json.load(f)
-        
-        exercises = [
-            (ex['name'], ex['muscle_group'], ex['default_sets'], ex['default_reps']) 
-            for ex in exercises_data
-        ]
-        
-        cur.executemany("INSERT INTO Exercises (name, muscle_group, default_sets, default_reps) VALUES (?, ?, ?, ?)", exercises)
-        conn.commit()
-    finally:
-        conn.close()
+            exercises = json.load(f)
 
+        # Очищаем таблицу перед загрузкой
+        _execute("DELETE FROM exercises", commit=True)
+        
+        # Сбрасываем автоинкрементный счетчик для sqlite
+        _execute("DELETE FROM sqlite_sequence WHERE name='exercises'", commit=True)
 
-def add_user(user_id, **kwargs):
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-    cur.execute("INSERT INTO Users (user_id, weight, height, age, gender, target, activity_level) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (user_id, kwargs['weight'], kwargs['height'], kwargs['age'], kwargs['gender'], kwargs['target'], kwargs['activity_level']))
-    conn.commit()
-    conn.close()
+        insert_query = "INSERT INTO exercises (name, muscle_group, default_sets, default_reps) VALUES (?, ?, ?, ?)"
+        
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            for ex in exercises:
+                cursor.execute(insert_query, (ex['name'], ex['muscle_group'], ex.get('default_sets'), ex.get('default_reps')))
+            conn.commit()
+
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Ошибка при загрузке упражнений из exercises.json: {e}")
+
+# --- Функции для работы с пользователями ---
 
 def get_user(user_id):
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM Users WHERE user_id = ?", (user_id,))
-    user = cur.fetchone()
-    conn.close()
-    return user
+    return _execute("SELECT user_id, weight, height, age, gender, target, activity_level FROM users WHERE user_id = ?", (user_id,), fetchone=True)
 
-def update_user_profile(user_id, data_to_update):
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-    
-    fields = ', '.join([f"{key} = ?" for key in data_to_update.keys()])
-    values = list(data_to_update.values())
-    values.append(user_id)
-    
-    cur.execute(f"UPDATE Users SET {fields} WHERE user_id = ?", values)
-    
-    conn.commit()
-    conn.close()
+def add_user(user_id, weight, height, age, gender, target, activity_level):
+    _execute(
+        "INSERT OR REPLACE INTO users (user_id, weight, height, age, gender, target, activity_level) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (user_id, weight, height, age, gender, target, activity_level),
+        commit=True
+    )
 
 def delete_user(user_id):
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-    try:
-        # 1. Найти все планы тренировок пользователя
-        cur.execute("SELECT plan_id FROM WorkoutPlans WHERE user_id = ?", (user_id,))
-        plan_ids = [row[0] for row in cur.fetchall()]
+    # Каскадное удаление само удалит связанные планы и логи
+    _execute("DELETE FROM users WHERE user_id = ?", (user_id,), commit=True)
 
-        # 2. Удалить записи о прогрессе
-        cur.execute("DELETE FROM ProgressLogs WHERE user_id = ?", (user_id,))
+def update_user_profile(user_id, fields_to_update):
+    if not fields_to_update:
+        return
+    set_clause = ", ".join([f"{key} = ?" for key in fields_to_update.keys()])
+    params = list(fields_to_update.values()) + [user_id]
+    _execute(f"UPDATE users SET {set_clause} WHERE user_id = ?", tuple(params), commit=True)
 
-        # 3. Если у пользователя были планы, удалить связанные с ними упражнения
-        if plan_ids:
-            # Создаем плейсхолдеры для IN-клаузы
-            placeholders = ','.join('?' for _ in plan_ids)
-            cur.execute(f"DELETE FROM WorkoutPlanExercises WHERE plan_id IN ({placeholders})", plan_ids)
-
-        # 4. Удалить сами планы тренировок
-        cur.execute("DELETE FROM WorkoutPlans WHERE user_id = ?", (user_id,))
-
-        # 5. Удалить пользователя
-        cur.execute("DELETE FROM Users WHERE user_id = ?", (user_id,))
-
-        conn.commit()
-    finally:
-        conn.close()
-
-# --- Функции для планов тренировок ---
+# --- Функции для работы с упражнениями ---
 
 def get_exercises_by_muscle_group(muscle_group):
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-    cur.execute("SELECT exercise_id, name FROM Exercises WHERE muscle_group = ?", (muscle_group,))
-    exercises = cur.fetchall()
-    conn.close()
-    return exercises
-
-def get_exercise_defaults(exercise_id):
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-    cur.execute("SELECT default_sets, default_reps FROM Exercises WHERE exercise_id = ?", (exercise_id,))
-    defaults = cur.fetchone()
-    conn.close()
-    return defaults
-
-def create_workout_plan(user_id, plan_name):
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-    cur.execute("INSERT INTO WorkoutPlans (user_id, name) VALUES (?, ?)", (user_id, plan_name))
-    plan_id = cur.lastrowid
-    conn.commit()
-    conn.close()
-    return plan_id
-
-def workout_plan_exists(user_id, plan_name):
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-    cur.execute("SELECT 1 FROM WorkoutPlans WHERE user_id = ? AND name = ?", (user_id, plan_name))
-    exists = cur.fetchone() is not None
-    conn.close()
-    return exists
-
-def add_exercise_to_plan(plan_id, exercise_id, sets, reps):
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-    cur.execute("INSERT INTO WorkoutPlanExercises (plan_id, exercise_id, sets, reps) VALUES (?, ?, ?, ?)",
-                (plan_id, exercise_id, sets, reps))
-    conn.commit()
-    conn.close()
-
-def get_user_workout_plans(user_id):
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-    cur.execute("SELECT plan_id, name FROM WorkoutPlans WHERE user_id = ?", (user_id,))
-    plans = cur.fetchall()
-    conn.close()
-    return plans
-
-def get_workout_plan_details(plan_id):
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT E.name, WPE.sets, WPE.reps
-        FROM WorkoutPlanExercises WPE
-        JOIN Exercises E ON WPE.exercise_id = E.exercise_id
-        WHERE WPE.plan_id = ?
-    """, (plan_id,))
-    details = cur.fetchall()
-    conn.close()
-    return details
+    """Возвращает список кортежей (id, name) для указанной группы мышц."""
+    return _execute("SELECT exercise_id, name FROM exercises WHERE muscle_group = ?", (muscle_group,), fetchall=True)
 
 def get_all_exercises():
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-    cur.execute("SELECT exercise_id, name FROM Exercises ORDER BY muscle_group, name")
-    exercises = cur.fetchall()
-    conn.close()
-    return exercises
+    """Возвращает список всех упражнений в виде кортежей (id, name)."""
+    return _execute("SELECT exercise_id, name FROM exercises", fetchall=True)
 
-def update_plan_name(plan_id, new_name):
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-    cur.execute("UPDATE WorkoutPlans SET name = ? WHERE plan_id = ?", (new_name, plan_id))
-    conn.commit()
-    conn.close()
+def get_exercise_defaults(exercise_id):
+    """Возвращает (default_sets, default_reps) для упражнения."""
+    return _execute("SELECT default_sets, default_reps FROM exercises WHERE exercise_id = ?", (exercise_id,), fetchone=True)
 
-def remove_exercise_from_plan(plan_id, exercise_id):
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-    # Используйте LIMIT 1, чтобы убедиться, что удаляется только один экземпляр, если существуют дубликаты
-    cur.execute("DELETE FROM WorkoutPlanExercises WHERE plan_id = ? AND exercise_id = ? LIMIT 1", (plan_id, exercise_id))
-    conn.commit()
-    conn.close()
+# --- Функции для работы с планами тренировок ---
+
+def get_user_workout_plans(user_id):
+    """Возвращает список планов пользователя (plan_id, name)."""
+    return _execute("SELECT plan_id, name FROM workout_plans WHERE user_id = ?", (user_id,), fetchall=True)
+
+def workout_plan_exists(user_id, plan_name):
+    """Проверяет, существует ли у пользователя план с таким названием."""
+    return _execute("SELECT 1 FROM workout_plans WHERE user_id = ? AND name = ?", (user_id, plan_name), fetchone=True) is not None
+
+def create_workout_plan(user_id, plan_name):
+    """Создает новый план тренировок и возвращает его ID."""
+    return _execute("INSERT INTO workout_plans (user_id, name) VALUES (?, ?)", (user_id, plan_name), commit=True)
+
+def add_exercise_to_plan(plan_id, exercise_id, sets, reps):
+    """Добавляет упражнение в план."""
+    _execute(
+        "INSERT INTO workout_plan_exercises (plan_id, exercise_id, sets, reps) VALUES (?, ?, ?, ?)",
+        (plan_id, exercise_id, sets, reps),
+        commit=True
+    )
+
+def get_workout_plan_details(plan_id):
+    """Возвращает детали плана: (exercise_name, sets, reps)."""
+    query = """
+        SELECT e.name, wpe.sets, wpe.reps
+        FROM workout_plan_exercises wpe
+        JOIN exercises e ON wpe.exercise_id = e.exercise_id
+        WHERE wpe.plan_id = ?
+    """
+    return _execute(query, (plan_id,), fetchall=True)
 
 def delete_workout_plan(plan_id):
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-    cur.execute("DELETE FROM WorkoutPlanExercises WHERE plan_id = ?", (plan_id,))
-    cur.execute("DELETE FROM WorkoutPlans WHERE plan_id = ?", (plan_id,))
-    conn.commit()
-    conn.close()
+    # Каскадное удаление удалит связанные упражнения из workout_plan_exercises
+    _execute("DELETE FROM workout_plans WHERE plan_id = ?", (plan_id,), commit=True)
 
-# --- Функции для журнала прогресса ---
+def update_plan_name(plan_id, new_name):
+    _execute("UPDATE workout_plans SET name = ? WHERE plan_id = ?", (new_name, plan_id), commit=True)
+
+def remove_exercise_from_plan(plan_id, exercise_id):
+    _execute(
+        "DELETE FROM workout_plan_exercises WHERE plan_id = ? AND exercise_id = ?",
+        (plan_id, exercise_id),
+        commit=True
+    )
+
+# --- Функции для работы с прогрессом ---
 
 def add_progress_log(user_id, exercise_id, weight, sets, reps):
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO ProgressLogs (user_id, exercise_id, weight, sets, reps, log_date)
-        VALUES (?, ?, ?, ?, ?, datetime('now'))
-    """, (user_id, exercise_id, weight, sets, reps))
-    conn.commit()
-    conn.close()
+    """Добавляет запись о прогрессе."""
+    _execute(
+        "INSERT INTO progress_logs (user_id, exercise_id, weight, sets, reps) VALUES (?, ?, ?, ?, ?)",
+        (user_id, exercise_id, weight, sets, reps),
+        commit=True
+    )
 
 def get_progress_logs(user_id, exercise_id, period='all'):
-    conn = sqlite3.connect('fitness_bot.db')
-    cur = conn.cursor()
-    
-    query = """
-        SELECT weight, sets, reps, strftime('%Y-%m-%d', log_date)
-        FROM ProgressLogs
-        WHERE user_id = ? AND exercise_id = ?
-    """
+    """Получает логи прогресса за определенный период ('week', 'month', 'all')."""
+    base_query = "SELECT weight, sets, reps, date(log_date) FROM progress_logs WHERE user_id = ? AND exercise_id = ?"
     params = [user_id, exercise_id]
 
     if period == 'week':
-        query += " AND log_date >= date('now', '-7 days')"
+        base_query += " AND log_date >= date('now', '-7 days')"
     elif period == 'month':
-        query += " AND log_date >= date('now', '-30 days')"
-
-    query += " ORDER BY log_date DESC"
+        base_query += " AND log_date >= date('now', '-30 days')"
     
-    cur.execute(query, params)
-    logs = cur.fetchall()
-    conn.close()
-    return logs
+    base_query += " ORDER BY log_date DESC"
+    
+    return _execute(base_query, tuple(params), fetchall=True)
